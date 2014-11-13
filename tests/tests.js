@@ -6,8 +6,6 @@ describe('logger tests', function(){
   var joi = require('joi');
   var events = [];
   var logs = [];
-  var options;
-  var discon = false;
   var p = {
     events: {
       on: function(type, handler){
@@ -17,52 +15,20 @@ describe('logger tests', function(){
     log: function(){}
   };
 
-  var remoteServer = net.createServer(function (c) {
-    c.on('data', function (data) {
-      var d = data.toString();
-
-      if(discon){
-        c.end();
-        return;
-      }
-
-      if (d.indexOf("rpush\r\n") > -1) {
-        logs.push(JSON.parse(d.split('\r\n')[6]));
-        c.write(':1\r\n');
-      }
-
-      if (d.indexOf("info\r\n") > -1) {
-        c.write('$32\r\n# Server\r\nredis_version:2.6.16\r\n');
-      }
-
-      if (d.indexOf("quit\r\n") > -1) {
-        c.end();
-      }
-    });
-  });
-
   before(function(done){
-    remoteServer.listen(function () {
-      options = {
-        redis: {
-          port: remoteServer.address().port
-        }
-      };
-      done();
-    });
+    plugin.register(p, {}, done);
   });
 
-  it('should register the plugin', function(done){
-    plugin.register(p, options, function(){
-      events.length.should.eql(3);
-      events[0].type.should.eql('tail');
-      events[1].type.should.eql('log');
-      events[2].type.should.eql('internalError');
-      done();
-    });
+  it('should register the plugin', function(){
+    events.length.should.eql(3);
+    events[0].type.should.eql('tail');
+    events[1].type.should.eql('log');
+    events[2].type.should.eql('internalError');
   });
 
   it('should handle a request', function(done){
+    var log = console.log
+    console.log = function(l){ logs.push(JSON.parse(l)); };
     events[0].handler({
       method: 'get',
       path: '/foo',
@@ -87,14 +53,15 @@ describe('logger tests', function(){
       }
     });
 
-    setTimeout(function(){
-      joi.validate(logs[0], schema.request, function(err){
-        done(err);
-      });
-    }, 10);
+    joi.validate(logs[0], schema.request, function(err){
+      console.log = log;
+      done(err);
+    });
   });
 
   it('should handle a log', function(done){
+    var log = console.log
+    console.log = function(l){ logs.push(JSON.parse(l)); };
     events[1].handler({
       data: {
         somestuff: 'blarg'
@@ -102,29 +69,22 @@ describe('logger tests', function(){
       tags: ['tag1', 'tag2']
     });
 
-    setTimeout(function(){
-      joi.validate(logs[1], schema.log, function(err){
-        done(err);
-      });
-    }, 10);
+    joi.validate(logs[1], schema.log, function(err){
+      console.log = log;
+      done(err);
+    });
   });
 
   it('should handle an error', function(done){
+    var log = console.log
+    console.log = function(l){ logs.push(JSON.parse(l)); };
     events[2].handler({}, {
       message: 'ohes noes it borked'
     });
 
-    setTimeout(function(){
-      joi.validate(logs[2], schema.error, function(err){
-        done(err);
-      });
-    }, 10);
-  });
-
-  it('should return immediately (without an error) when an error occurs', function(){
-    discon = true;
-    events[2].handler({}, {
-      message: 'ohes noes it borked'
+    joi.validate(logs[2], schema.error, function(err){
+      console.log = log;
+      done(err);
     });
   });
 });

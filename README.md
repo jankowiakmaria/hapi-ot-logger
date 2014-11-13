@@ -3,7 +3,7 @@
 
 Hapi plugin for ot-logging standards.
 
-Currently only supports redis.
+Currently only supports stdout.
 
 installation:
 
@@ -26,12 +26,7 @@ server.pack.register([
         log: 'v3',
         error: 'v2'
       },
-      redis: {
-        host: '127.0.0.1',
-        port: 6379,
-        listname: 'logs'
-      },
-      console: true // optional console output for debugging, defaults to false
+      pretty: false // pretty console output for dev
     }
   }], function(err){
     if(err){
@@ -44,7 +39,3 @@ server.pack.register([
 });
 
 ```
-
-Future plans:
-
-- Add kafka support
